@@ -39,9 +39,26 @@ Use the following format for branches and commits:
 - `ci` — CI/workflow changes
 - `docs` — documentation
 
+## Issue conventions
+
+Issue titles should use scoped prefixes matching the commit type and scope:
+
+```
+<type>(<scope>): <short description>
+```
+
+Examples:
+
+- `chore(tap): bootstrap Homebrew tap repository`
+- `feat(stackctl): add formula for stackctl release binaries`
+- `ci(tap): validate formula audit and install`
+
+Apply labels that carry taxonomy context (`enhancement`, `bug`, `documentation`, `ci`, `stackctl`, `formula`).
+
 ## Pull request process
 
 - All formula changes must include validation output or a clear reason why validation cannot run.
+- PRs must be linked to individual issues.
 - PRs should target `main`.
 - Keep PRs focused on a single formula or change.
 
