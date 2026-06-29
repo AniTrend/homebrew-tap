@@ -5,17 +5,27 @@
 #   2. repository_dispatch — triggered by AniTrend/stackctl release workflow (commented out,
 #      enable once release automation is stable)
 #
-# Requirements:
-#   - TAP_RELEASE_TOKEN secret with repo scope access to AniTrend/homebrew-tap
-#     (GITHUB_TOKEN cannot cross repos to read AniTrend/stackctl releases).
+# Token requirements:
+#   This workflow needs read access to AniTrend/stackctl releases (cross-repo) and
+#   write access to create branches/PRs on this repository. Use one of:
+#
+#   - Fine-grained PAT with scope: "Contents: write" + "Pull requests: write"
+#     on AniTrend/homebrew-tap, and "Contents: read" on AniTrend/stackctl.
+#   - GitHub App token with equivalent permissions.
+#
+#   GITHUB_TOKEN is intentionally NOT used because it cannot cross repos to read
+#   AniTrend/stackctl releases. Store the token as TAP_RELEASE_TOKEN in repo secrets.
 #
 # Behavior:
-#   - Fetches release metadata for the given version from AniTrend/stackctl
-#   - Downloads each asset, computes SHA256
-#   - Patches Formula/stackctl.rb with new version, URLs, and checksums
-#   - Validates the updated formula (brew install + brew test)
-#   - Opens a pull request on homebrew-tap
-#   - Dry-run mode validates data without opening a PR
+#   - Validates that the formula has a real version (not placeholder 0.0.0).
+#   - Fetches release metadata for the given version from AniTrend/stackctl.
+#   - Filters release assets to the 4 expected platform tarballs; fails if
+#     the expected set is incomplete.
+#   - Downloads each asset, computes SHA256.
+#   - Patches Formula/stackctl.rb with new version, URLs, and checksums.
+#   - Validates the updated formula (brew install + brew test).
+#   - Opens a pull request on homebrew-tap.
+#   - Dry-run mode validates data without opening a PR.
 
 name: Update stackctl formula
 
@@ -31,9 +41,16 @@ on:
         default: false
         type: boolean
 
-  # FIXME: Enable once release automation is stable
+  # FIXME: Enable once release automation is stable.
+  # When enabling:
+  #   1. Change the job-level `if:` condition to accept repository_dispatch events.
+  #   2. Add `types: [stackctl-release]` to match the release workflow payload.
   # repository_dispatch:
   #   types: [stackctl-release]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 defaults:
   run:
@@ -47,12 +64,14 @@ jobs:
   update-formula:
     name: Update formula to ${{ inputs.version }}
     runs-on: ubuntu-latest
+    # NOTE: When repository_dispatch is enabled, update this condition to:
+    # if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
     if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Validate version input
         run: |
-          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: version must be a semver tag with v prefix (e.g. v0.1.0)"
             echo "Note: Pre-release tags (e.g. v0.1.0-alpha.1) are not currently supported."
             exit 1
@@ -63,12 +82,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          # PAT required for cross-repo access to read AniTrend/stackctl releases
-          # and for creating branches/PRs on homebrew-tap.
           token: ${{ secrets.TAP_RELEASE_TOKEN }}
 
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Verify formula is not placeholder
+        run: |
+          VERSION=$(grep -E '^version ' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$VERSION" = "0.0.0" ]; then
+            echo "Error: Formula/stackctl.rb still uses placeholder version 0.0.0."
+            echo "This workflow requires a real formula with actual release URLs."
+            echo ""
+            echo "Fix: Replace the placeholder version, URLs, and SHA256s in"
+            echo "Formula/stackctl.rb with values from the first stackctl release,"
+            echo "or merge the formula PR that delivers real values first."
+            exit 1
+          fi
+          echo "Formula version: $VERSION (OK)"
 
       - name: Fetch release metadata
         id: release
@@ -81,6 +112,7 @@ jobs:
 
           if [ -z "$RELEASE_JSON" ] || [ "$RELEASE_JSON" = "null" ]; then
             echo "Error: Release ${{ inputs.version }} not found in AniTrend/stackctl"
+            echo ""
             echo "Available releases:"
             gh release list --repo AniTrend/stackctl --limit 10 2>/dev/null || echo "(none)"
             exit 1
@@ -88,28 +120,61 @@ jobs:
 
           echo "RELEASE_JSON=$(echo "$RELEASE_JSON" | jq -c .)" >> "$GITHUB_ENV"
 
-      - name: Download assets and compute SHA256
+      - name: Filter and validate release assets
         id: assets
         env:
           GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
         run: |
           VERSION="${{ inputs.version }}"
-          ASSETS_DIR=$(mktemp -d)
+          VERSION_NUM="${VERSION#v}"
 
-          ASSET_NAMES=$(echo "$RELEASE_JSON" | jq -r '.assets[].name')
+          # Expected platform tarballs
+          EXPECTED_ARCHS=(
+            "x86_64-apple-darwin"
+            "aarch64-apple-darwin"
+            "x86_64-unknown-linux-gnu"
+            "aarch64-unknown-linux-gnu"
+          )
 
-          if [ -z "$ASSET_NAMES" ]; then
-            echo "Error: No assets found in release $VERSION"
-            echo "Release JSON: $RELEASE_JSON"
+          # Get all tarball assets from the release
+          ALL_TARBALLS=$(echo "$RELEASE_JSON" | jq -r \
+            '.assets[] | select(.name | endswith(".tar.gz")) | .name')
+
+          if [ -z "$ALL_TARBALLS" ]; then
+            echo "Error: No .tar.gz assets found in release $VERSION"
+            echo "Release assets:"
+            echo "$RELEASE_JSON" | jq -r '.assets[].name'
             exit 1
           fi
 
-          echo "Found assets:"
-          echo "$ASSET_NAMES"
+          echo "Available tarballs:"
+          echo "$ALL_TARBALLS"
+
+          # Validate all 4 expected assets are present
+          MISSING=false
+          for ARCH in "${EXPECTED_ARCHS[@]}"; do
+            EXPECTED_NAME="stackctl-${VERSION_NUM}-${ARCH}.tar.gz"
+            if ! echo "$ALL_TARBALLS" | grep -qF "$EXPECTED_NAME"; then
+              echo "ERROR: Missing expected asset: $EXPECTED_NAME"
+              MISSING=true
+            fi
+          done
+
+          if [ "$MISSING" = true ]; then
+            echo ""
+            echo "Not all expected platform tarballs are present."
+            echo "Expected archs: ${EXPECTED_ARCHS[*]}"
+            exit 1
+          fi
+
+          # Download and checksum only the expected tarballs
+          ASSETS_DIR=$(mktemp -d)
 
           UPDATES="["
           FIRST=true
-          while IFS= read -r ASSET; do
+          for ARCH in "${EXPECTED_ARCHS[@]}"; do
+            ASSET="stackctl-${VERSION_NUM}-${ARCH}.tar.gz"
+
             gh release download "$VERSION" \
               --repo AniTrend/stackctl \
               --pattern "$ASSET" \
@@ -128,7 +193,7 @@ jobs:
               --arg sha "$SHA" \
               --arg url "https://github.com/AniTrend/stackctl/releases/download/$VERSION/$ASSET" \
               '{asset: $name, sha256: $sha, url: $url}')
-          done <<< "$ASSET_NAMES"
+          done
 
           UPDATES+="]"
           echo "UPDATES=$UPDATES" >> "$GITHUB_ENV"
@@ -148,8 +213,8 @@ jobs:
           # Update version line
           sed -i "s/^version \".*\"/version \"$VERSION_NUM\"/" "$FORMULA"
 
-          # For each asset, patch URL and SHA256 by matching the target triple
-          # in the tarball asset name with the formula's URL pattern.
+          # For each platform asset, patch URL and SHA256 by matching the
+          # target triple in the asset name with the formula's URL patterns.
           echo "$UPDATES" | jq -c '.[]' | while IFS= read -r ASSET; do
             ASSET_NAME=$(echo "$ASSET" | jq -r '.asset')
             SHA=$(echo "$ASSET" | jq -r '.sha256')
@@ -157,7 +222,6 @@ jobs:
 
             echo "Patching: $ASSET_NAME"
 
-            # Extract target triple (e.g. aarch64-apple-darwin) from asset name
             TARGET=$(echo "$ASSET_NAME" | sed "s/^stackctl-v[0-9.]*-//" | sed 's/\.tar\.gz$//')
             ESCAPED_TARGET=$(echo "$TARGET" | sed 's/[.]/\\./g')
 
