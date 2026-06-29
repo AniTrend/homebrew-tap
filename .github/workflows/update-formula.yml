@@ -1,0 +1,238 @@
+# Automated stackctl formula update workflow
+#
+# Supports:
+#   1. workflow_dispatch  — manually trigger with a version tag (e.g. v0.1.0)
+#   2. repository_dispatch — triggered by AniTrend/stackctl release workflow (commented out,
+#      enable once release automation is stable)
+#
+# Requirements:
+#   - TAP_RELEASE_TOKEN secret with repo scope access to AniTrend/homebrew-tap
+#     (GITHUB_TOKEN cannot cross repos to read AniTrend/stackctl releases).
+#
+# Behavior:
+#   - Fetches release metadata for the given version from AniTrend/stackctl
+#   - Downloads each asset, computes SHA256
+#   - Patches Formula/stackctl.rb with new version, URLs, and checksums
+#   - Validates the updated formula (brew install + brew test)
+#   - Opens a pull request on homebrew-tap
+#   - Dry-run mode validates data without opening a PR
+
+name: Update stackctl formula
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "stackctl release tag (e.g. v0.1.0)"
+        required: true
+        type: string
+      dry-run:
+        description: "Validate release data without opening a PR"
+        default: false
+        type: boolean
+
+  # FIXME: Enable once release automation is stable
+  # repository_dispatch:
+  #   types: [stackctl-release]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_ENV_HINTS: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+jobs:
+  update-formula:
+    name: Update formula to ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Validate version input
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Error: version must be a semver tag with v prefix (e.g. v0.1.0)"
+            echo "Note: Pre-release tags (e.g. v0.1.0-alpha.1) are not currently supported."
+            exit 1
+          fi
+          echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
+          echo "DRY_RUN=${{ inputs.dry-run || 'false' }}" >> "$GITHUB_ENV"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # PAT required for cross-repo access to read AniTrend/stackctl releases
+          # and for creating branches/PRs on homebrew-tap.
+          token: ${{ secrets.TAP_RELEASE_TOKEN }}
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Fetch release metadata
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+        run: |
+          RELEASE_JSON=$(gh release view "${{ inputs.version }}" \
+            --repo AniTrend/stackctl \
+            --json tagName,assets,body 2>/dev/null || true)
+
+          if [ -z "$RELEASE_JSON" ] || [ "$RELEASE_JSON" = "null" ]; then
+            echo "Error: Release ${{ inputs.version }} not found in AniTrend/stackctl"
+            echo "Available releases:"
+            gh release list --repo AniTrend/stackctl --limit 10 2>/dev/null || echo "(none)"
+            exit 1
+          fi
+
+          echo "RELEASE_JSON=$(echo "$RELEASE_JSON" | jq -c .)" >> "$GITHUB_ENV"
+
+      - name: Download assets and compute SHA256
+        id: assets
+        env:
+          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          ASSETS_DIR=$(mktemp -d)
+
+          ASSET_NAMES=$(echo "$RELEASE_JSON" | jq -r '.assets[].name')
+
+          if [ -z "$ASSET_NAMES" ]; then
+            echo "Error: No assets found in release $VERSION"
+            echo "Release JSON: $RELEASE_JSON"
+            exit 1
+          fi
+
+          echo "Found assets:"
+          echo "$ASSET_NAMES"
+
+          UPDATES="["
+          FIRST=true
+          while IFS= read -r ASSET; do
+            gh release download "$VERSION" \
+              --repo AniTrend/stackctl \
+              --pattern "$ASSET" \
+              --dir "$ASSETS_DIR"
+
+            SHA=$(sha256sum "$ASSETS_DIR/$ASSET" | cut -d' ' -f1)
+
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              UPDATES+=","
+            fi
+
+            UPDATES+=$(jq -n \
+              --arg name "$ASSET" \
+              --arg sha "$SHA" \
+              --arg url "https://github.com/AniTrend/stackctl/releases/download/$VERSION/$ASSET" \
+              '{asset: $name, sha256: $sha, url: $url}')
+          done <<< "$ASSET_NAMES"
+
+          UPDATES+="]"
+          echo "UPDATES=$UPDATES" >> "$GITHUB_ENV"
+
+          echo ""
+          echo "=== Asset SHA256 Checksums ==="
+          echo "$UPDATES" | jq -r '.[] | "\(.asset): \(.sha256)"'
+
+      - name: Patch formula
+        run: |
+          FORMULA="Formula/stackctl.rb"
+          VERSION_NUM="${VERSION#v}"
+
+          echo "=== Before patch ==="
+          head -5 "$FORMULA"
+
+          # Update version line
+          sed -i "s/^version \".*\"/version \"$VERSION_NUM\"/" "$FORMULA"
+
+          # For each asset, patch URL and SHA256 by matching the target triple
+          # in the tarball asset name with the formula's URL pattern.
+          echo "$UPDATES" | jq -c '.[]' | while IFS= read -r ASSET; do
+            ASSET_NAME=$(echo "$ASSET" | jq -r '.asset')
+            SHA=$(echo "$ASSET" | jq -r '.sha256')
+            URL=$(echo "$ASSET" | jq -r '.url')
+
+            echo "Patching: $ASSET_NAME"
+
+            # Extract target triple (e.g. aarch64-apple-darwin) from asset name
+            TARGET=$(echo "$ASSET_NAME" | sed "s/^stackctl-v[0-9.]*-//" | sed 's/\.tar\.gz$//')
+            ESCAPED_TARGET=$(echo "$TARGET" | sed 's/[.]/\\./g')
+
+            # Patch URL line containing this target
+            sed -i "/${ESCAPED_TARGET}\.tar\.gz/s|url \".*\"|url \"$URL\"|" "$FORMULA"
+
+            # Patch sha256 on the line following the matching URL
+            sed -i "/${ESCAPED_TARGET}\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$FORMULA"
+          done
+
+          echo ""
+          echo "=== After patch ==="
+          grep -E "^(version|  url|  sha256)" "$FORMULA"
+
+      - name: Validate updated formula
+        id: validate
+        run: |
+          echo "Running brew style..."
+          brew style Formula/stackctl.rb
+
+          echo ""
+          echo "Running brew audit..."
+          brew audit --strict --online Formula/stackctl.rb
+
+          echo ""
+          echo "Running brew install..."
+          brew install --formula Formula/stackctl.rb
+
+          echo ""
+          echo "Running brew test..."
+          brew test stackctl
+
+      - name: Create pull request
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          BRANCH="ci/update-stackctl-formula-v${VERSION#v}"
+
+          git config user.name "AniTrend Bot"
+          git config user.email "anitrendapp@gmail.com"
+
+          git checkout -b "$BRANCH"
+          git add Formula/stackctl.rb
+          git commit -m "ci(stackctl): update formula to ${VERSION}"
+
+          git push origin "$BRANCH"
+
+          # Build PR body
+          BODY=$(printf '## Automated formula update\n\n')
+          BODY="${BODY}$(printf 'Updates stackctl formula to **%s**.\n\n' "${VERSION}")"
+          BODY="${BODY}$(printf '### Release assets\n\n')"
+          BODY="${BODY}$(printf '```\n')"
+          BODY="${BODY}$(echo "$UPDATES" | jq -r '.[] | "\(.asset): \(.sha256)"')"
+          BODY="${BODY}$(printf '\n```\n\n')"
+          BODY="${BODY}$(printf '### Validation\n\n')"
+          BODY="${BODY}$(printf -- '- brew style: passed\n')"
+          BODY="${BODY}$(printf -- '- brew audit: completed\n')"
+          BODY="${BODY}$(printf -- '- brew install: completed\n')"
+          BODY="${BODY}$(printf -- '- brew test: completed\n')"
+
+          gh pr create \
+            --repo AniTrend/homebrew-tap \
+            --base main \
+            --head "$BRANCH" \
+            --title "ci(stackctl): update formula to ${VERSION}" \
+            --body "$BODY"
+
+      - name: Dry-run summary
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "=== DRY RUN - No PR created ==="
+          echo "Version: ${{ inputs.version }}"
+          echo "Assets:"
+          echo "$UPDATES" | jq -r '.[] | "  \(.asset): \(.sha256)"'
+          echo ""
+          echo "Formula would be patched and PR would be opened."
