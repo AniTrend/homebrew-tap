@@ -1,0 +1,3 @@
+# Git-ignored but readable to OpenCode
+!.slim/deepwork/
+!.slim/deepwork/**

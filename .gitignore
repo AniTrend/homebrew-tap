@@ -1,0 +1,9 @@
+# Local dev / IDE
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+
+# Deepwork session state
+.slim/deepwork/
