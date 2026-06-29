@@ -8,8 +8,8 @@
 # AniTrend/stackctl GitHub Releases. Platform target naming assumes Rust-style
 # triple convention. These must be verified against the first real release.
 #
-# ASSUMPTION: stackctl supports a `completion` subcommand for shell completion
-# generation. This may be Cobra-style (`stackctl completion bash`) or other.
+# ASSUMPTION: stackctl supports a `completions` subcommand for shell completion
+# generation. This may be Cobra-style (`stackctl completions bash`) or other.
 # Completion generation is commented out below until a real binary is available.
 #
 # ASSUMPTION: 4 platform targets are provided:
@@ -67,7 +67,7 @@ class Stackctl < Formula
     # if build.stable? && version != "0.0.0"
     #   generate_completions_from_executable(
     #     bin/"stackctl",
-    #     "completion",
+    #     "completions",
     #     shell_parameter_format: :cobra
     #   )
     # end
