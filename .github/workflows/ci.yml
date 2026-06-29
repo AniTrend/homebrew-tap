@@ -1,0 +1,106 @@
+# CI workflow for Homebrew formula validation
+#
+# Triggers:
+#   - Pull requests and pushes to main (path-filtered)
+#   - workflow_dispatch with optional perform-install flag
+#
+# Jobs:
+#   lint      — Ruby syntax/style check (always runs)
+#   audit     — brew audit with continue-on-error (placeholder formulas tolerated)
+#   install   — brew install + test (conditional, requires perform-install=true)
+#
+# Docs-only changes (README.md, CONTRIBUTING.md, etc.) skip all formula jobs.
+
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "Formula/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Formula/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+    inputs:
+      perform-install:
+        description: "Run brew install + brew test"
+        default: false
+        type: boolean
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_ENV_HINTS: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_DEVELOPER: 1
+
+jobs:
+  lint:
+    name: Ruby style check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Run brew style
+        run: |
+          brew style Formula/
+
+  audit:
+    name: Formula audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Tap self (required for brew audit)
+        run: |
+          brew tap AniTrend/tap "${{ github.workspace }}"
+
+      - name: Run brew audit
+        run: |
+          brew audit --strict --online Formula/stackctl.rb 2>&1 \
+            | tee "${{ runner.temp }}/brew-audit.log"
+
+      - name: Upload audit log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-log
+          path: "${{ runner.temp }}/brew-audit.log"
+          retention-days: 7
+
+  install:
+    name: Install and test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.perform-install == true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Tap self
+        run: |
+          brew tap AniTrend/tap "${{ github.workspace }}"
+
+      - name: Install formula
+        run: |
+          brew install --formula Formula/stackctl.rb
+
+      - name: Test formula
+        run: |
+          brew test stackctl
