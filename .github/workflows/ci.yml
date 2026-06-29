@@ -6,7 +6,7 @@
 #
 # Jobs:
 #   lint      — Ruby syntax/style check (always runs)
-#   audit     — brew audit with continue-on-error (placeholder formulas tolerated)
+#   audit     — brew audit (non-blocking for placeholder, blocking for real versions)
 #   install   — brew install + test (conditional, requires perform-install=true)
 #
 # Docs-only changes (README.md, CONTRIBUTING.md, etc.) skip all formula jobs.
@@ -29,6 +29,9 @@ on:
         description: "Run brew install + brew test"
         default: false
         type: boolean
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -57,7 +60,6 @@ jobs:
   audit:
     name: Formula audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -69,10 +71,28 @@ jobs:
         run: |
           brew tap AniTrend/tap "${{ github.workspace }}"
 
+      - name: Detect placeholder version
+        id: version-check
+        run: |
+          VERSION=$(grep -E '^version ' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$VERSION" = "0.0.0" ]; then
+            echo "placeholder=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "placeholder=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run brew audit
+        env:
+          IS_PLACEHOLDER: ${{ steps.version-check.outputs.placeholder }}
         run: |
           brew audit --strict --online Formula/stackctl.rb 2>&1 \
             | tee "${{ runner.temp }}/brew-audit.log"
+          # Skip exit code check for placeholder versions (0.0.0).
+          # For real versions, audit failures are blocking.
+          if [ "${IS_PLACEHOLDER}" = "true" ]; then
+            echo "Audit completed (placeholder — non-blocking)"
+            exit 0
+          fi
 
       - name: Upload audit log
         if: failure()
