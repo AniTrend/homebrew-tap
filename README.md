@@ -14,14 +14,24 @@ This convention lets Homebrew resolve `AniTrend/tap` to `github.com/AniTrend/hom
 
 ## Usage
 
-Add the tap and install a formula:
+Add the tap:
 
 ```bash
 brew tap AniTrend/tap
+```
+
+Once a formula is published, install it:
+
+```bash
 brew install stackctl
 ```
 
-Once tapped, installed tools can be upgraded with:
+After the first stackctl release, the formula at `Formula/stackctl.rb` will
+point to real release assets. Until then, the formula is a placeholder and
+`brew install` will fail. Follow [AniTrend/stackctl](https://github.com/AniTrend/stackctl)
+for release announcements.
+
+Once installed, tools can be upgraded with:
 
 ```bash
 brew upgrade stackctl
@@ -89,14 +99,14 @@ If the error persists, the formula may need a checksum update. Check the [latest
 
 ### Unsupported OS or architecture
 
-`stackctl` is currently available for:
+`stackctl` planned release targets are:
 
 - macOS ARM64 (Apple Silicon)
 - macOS x86_64 (Intel)
 - Linux ARM64
 - Linux x86_64
 
-Other platforms may be added in future releases.
+Additional platforms may be added in future releases.
 
 ### Secrets commands fail
 
@@ -125,7 +135,8 @@ stackctl doctor --check-secrets
 
 ### Update stackctl after a release
 
-Trigger the [Update stackctl formula](https://github.com/AniTrend/homebrew-tap/actions/workflows/update-formula.yml) workflow:
+Use the `Update stackctl formula` workflow (Actions tab) to automate formula
+updates when a new stackctl release is published:
 
 ```bash
 # Manual dispatch with version tag
