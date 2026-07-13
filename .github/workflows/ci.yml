@@ -76,7 +76,7 @@ jobs:
       - name: Detect placeholder version
         id: version-check
         run: |
-          VERSION=$(grep -E '^\s*version\s' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep -E '^[[:space:]]*version[[:space:]]' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
           if [ "$VERSION" = "0.0.0" ]; then
             echo "placeholder=true" >> "$GITHUB_OUTPUT"
           else
