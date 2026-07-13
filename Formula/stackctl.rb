@@ -23,11 +23,11 @@
 class Stackctl < Formula
   desc "Repository-aware Docker Swarm stack controller with SOPS/age support"
   homepage "https://github.com/AniTrend/stackctl"
-  license "Apache-2.0"
-
   # FIXME: Update version and sha256 when AniTrend/stackctl publishes first release.
   # After update, run: brew audit --strict --online Formula/stackctl.rb
   version "0.0.0"
+
+  license "Apache-2.0"
 
   # No bottles exist for this tap formula — binaries are downloaded
   # directly from GitHub Releases.
@@ -36,21 +36,21 @@ class Stackctl < Formula
   on_macos do
     on_arm do
       url "https://github.com/AniTrend/stackctl/releases/download/v#{version}/stackctl-v#{version}-aarch64-apple-darwin.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME placeholder
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME: placeholder
     end
     on_intel do
       url "https://github.com/AniTrend/stackctl/releases/download/v#{version}/stackctl-v#{version}-x86_64-apple-darwin.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME placeholder
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME: placeholder
     end
   end
   on_linux do
     on_arm do
       url "https://github.com/AniTrend/stackctl/releases/download/v#{version}/stackctl-v#{version}-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME placeholder
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME: placeholder
     end
     on_intel do
       url "https://github.com/AniTrend/stackctl/releases/download/v#{version}/stackctl-v#{version}-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME placeholder
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # FIXME: placeholder
     end
   end
 
@@ -73,11 +73,6 @@ class Stackctl < Formula
     # end
   end
 
-  test do
-    assert_match version.to_s, shell_output("#{bin}/stackctl --version")
-    system bin/"stackctl", "--help"
-  end
-
   def caveats
     <<~EOS
       Secrets commands require sops and age.
@@ -88,5 +83,10 @@ class Stackctl < Formula
       Validate with:
         stackctl doctor --check-secrets
     EOS
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/stackctl --version")
+    system bin/"stackctl", "--help"
   end
 end

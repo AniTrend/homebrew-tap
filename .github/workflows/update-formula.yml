@@ -94,7 +94,7 @@ jobs:
 
       - name: Verify formula is not placeholder
         run: |
-          VERSION=$(grep -E '^version ' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep -E '^[[:space:]]*version[[:space:]]' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
           if [ "$VERSION" = "0.0.0" ]; then
             echo "Error: Formula/stackctl.rb still uses placeholder version 0.0.0."
             echo "This workflow requires a real formula with actual release URLs."
@@ -249,7 +249,7 @@ jobs:
 
           echo ""
           echo "Running brew audit..."
-          brew audit --strict --online Formula/stackctl.rb
+          brew audit --strict --online stackctl
 
           echo ""
           echo "Running brew install..."
