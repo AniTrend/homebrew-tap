@@ -73,11 +73,6 @@ class Stackctl < Formula
     # end
   end
 
-  test do
-    assert_match version.to_s, shell_output("#{bin}/stackctl --version")
-    system bin/"stackctl", "--help"
-  end
-
   def caveats
     <<~EOS
       Secrets commands require sops and age.
@@ -88,5 +83,10 @@ class Stackctl < Formula
       Validate with:
         stackctl doctor --check-secrets
     EOS
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/stackctl --version")
+    system bin/"stackctl", "--help"
   end
 end
