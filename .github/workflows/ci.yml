@@ -87,8 +87,10 @@ jobs:
         env:
           IS_PLACEHOLDER: ${{ steps.version-check.outputs.placeholder }}
         run: |
+          set +o pipefail
           brew audit --strict --online stackctl 2>&1 \
             | tee "${{ runner.temp }}/brew-audit.log"
+          set -o pipefail
           # Skip exit code check for placeholder versions (0.0.0).
           # For real versions, audit failures are blocking.
           if [ "${IS_PLACEHOLDER}" = "true" ]; then
