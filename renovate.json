@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":enableVulnerabilityAlerts"
+  ],
+  "timezone": "Africa/Johannesburg",
+  "schedule": ["every weekend"],
+  "labels": ["dependencies"],
+  "commitMessagePrefix": "chore(deps):",
+  "branchPrefix": "ci/deps/",
+  "homebrew": { "enabled": false },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "addLabels": ["github-actions"]
+    }
+  ]
+}
