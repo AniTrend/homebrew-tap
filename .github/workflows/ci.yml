@@ -108,7 +108,9 @@ jobs:
 
       - name: Clean up local tap
         if: always()
-        run: brew untap AniTrend/tap 2>/dev/null || true
+        run: |
+          brew untap AniTrend/tap 2>/dev/null || true
+          rm -rf "$(brew --prefix)/Homebrew/Library/Taps/anitrend" 2>/dev/null || true
 
   install:
     name: Install and test
@@ -137,4 +139,7 @@ jobs:
 
       - name: Clean up local tap
         if: always()
-        run: brew untap AniTrend/tap 2>/dev/null || true
+        run: |
+          brew untap AniTrend/tap 2>/dev/null || true
+          rm -rf "$(brew --prefix)/Homebrew/Library/Taps/anitrend" 2>/dev/null || true
+
