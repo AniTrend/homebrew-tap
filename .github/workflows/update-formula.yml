@@ -1,20 +1,17 @@
 # Automated stackctl formula update workflow
 #
 # Supports:
-#   1. workflow_dispatch  — manually trigger with a version tag (e.g. v0.1.0)
-#   2. repository_dispatch — triggered by AniTrend/stackctl release workflow (commented out,
-#      enable once release automation is stable)
+#   1. workflow_dispatch  - manually trigger with a version tag (e.g. v0.1.0)
+#   2. repository_dispatch - triggered by AniTrend/stackctl release workflow
+#      when a new release is published (event type: stackctl-release)
 #
 # Token requirements:
 #   This workflow needs read access to AniTrend/stackctl releases (cross-repo) and
-#   write access to create branches/PRs on this repository. Use one of:
-#
-#   - Fine-grained PAT with scope: "Contents: write" + "Pull requests: write"
-#     on AniTrend/homebrew-tap, and "Contents: read" on AniTrend/stackctl.
-#   - GitHub App token with equivalent permissions.
-#
-#   GITHUB_TOKEN is intentionally NOT used because it cannot cross repos to read
-#   AniTrend/stackctl releases. Store the token as TAP_RELEASE_TOKEN in repo secrets.
+#   write access to create branches/PRs on this repository. A GitHub App token is
+#   used via actions/create-github-app-token@v3, requiring APP_ID and APP_PRIVATE_KEY
+#   secrets. The App must be installed on both AniTrend/stackctl and AniTrend/homebrew-tap
+#   with appropriate permissions (contents: read on stackctl, contents: write + pull-requests:
+#   write on homebrew-tap).
 #
 # Behavior:
 #   - Validates that the formula has a real version (not placeholder 0.0.0).
@@ -45,8 +42,8 @@ on:
   # When enabling:
   #   1. Change the job-level `if:` condition to accept repository_dispatch events.
   #   2. Add `types: [stackctl-release]` to match the release workflow payload.
-  # repository_dispatch:
-  #   types: [stackctl-release]
+  repository_dispatch:
+    types: [stackctl-release]
 
 permissions:
   contents: write
@@ -62,27 +59,35 @@ env:
 
 jobs:
   update-formula:
-    name: Update formula to ${{ inputs.version }}
+    name: Update formula to ${{ inputs.version || github.event.client_payload.version }}
     runs-on: ubuntu-latest
-    # NOTE: When repository_dispatch is enabled, update this condition to:
-    # if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
 
     steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: AniTrend
+          repositories: stackctl,homebrew-tap
+
       - name: Validate version input
         run: |
-          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: version must be a semver tag with v prefix (e.g. v0.1.0)"
             echo "Note: Pre-release tags (e.g. v0.1.0-alpha.1) are not currently supported."
             exit 1
           fi
-          echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
+          echo "VERSION=${{ inputs.version || github.event.client_payload.version }}" >> "$GITHUB_ENV"
           echo "DRY_RUN=${{ inputs.dry-run || 'false' }}" >> "$GITHUB_ENV"
 
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.TAP_RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
@@ -104,14 +109,14 @@ jobs:
       - name: Fetch release metadata
         id: release
         env:
-          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          RELEASE_JSON=$(gh release view "${{ inputs.version }}" \
+          RELEASE_JSON=$(gh release view "${{ inputs.version || github.event.client_payload.version }}" \
             --repo AniTrend/stackctl \
             --json tagName,assets,body 2>/dev/null || true)
 
           if [ -z "$RELEASE_JSON" ] || [ "$RELEASE_JSON" = "null" ]; then
-            echo "Error: Release ${{ inputs.version }} not found in AniTrend/stackctl"
+            echo "Error: Release ${{ inputs.version || github.event.client_payload.version }} not found in AniTrend/stackctl"
             echo ""
             echo "Available releases:"
             gh release list --repo AniTrend/stackctl --limit 10 2>/dev/null || echo "(none)"
@@ -123,9 +128,9 @@ jobs:
       - name: Filter and validate release assets
         id: assets
         env:
-          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
           VERSION_NUM="${VERSION#v}"
 
           # Expected platform tarballs
@@ -257,9 +262,9 @@ jobs:
       - name: Create pull request
         if: env.DRY_RUN != 'true'
         env:
-          GH_TOKEN: ${{ secrets.TAP_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
           BRANCH="ci/update-stackctl-formula-v${VERSION#v}"
 
           git config user.name "AniTrend Bot"
@@ -295,7 +300,7 @@ jobs:
         if: env.DRY_RUN == 'true'
         run: |
           echo "=== DRY RUN - No PR created ==="
-          echo "Version: ${{ inputs.version }}"
+          echo "Version: ${{ inputs.version || github.event.client_payload.version }}"
           echo "Assets:"
           echo "$UPDATES" | jq -r '.[] | "  \(.asset): \(.sha256)"'
           echo ""
