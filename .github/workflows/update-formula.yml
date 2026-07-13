@@ -249,7 +249,7 @@ jobs:
 
           echo ""
           echo "Running brew audit..."
-          brew audit --strict --online Formula/stackctl.rb
+          brew audit --strict --online stackctl
 
           echo ""
           echo "Running brew install..."
