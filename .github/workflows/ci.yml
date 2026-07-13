@@ -70,7 +70,7 @@ jobs:
       - name: Tap self (required for brew audit)
         run: |
           brew untap AniTrend/tap 2>/dev/null || true
-          brew tap AniTrend/tap "${{ github.workspace }}"
+          brew tap --force AniTrend/tap "${{ github.workspace }}"
 
       - name: Detect placeholder version
         id: version-check
@@ -117,7 +117,7 @@ jobs:
       - name: Tap self
         run: |
           brew untap AniTrend/tap 2>/dev/null || true
-          brew tap AniTrend/tap "${{ github.workspace }}"
+          brew tap --force AniTrend/tap "${{ github.workspace }}"
 
       - name: Install formula
         run: |
