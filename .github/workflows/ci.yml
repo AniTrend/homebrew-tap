@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c
 
       - name: Run brew style
         run: |
@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c
 
       - name: Tap self (required for brew audit)
         run: |
@@ -106,6 +106,10 @@ jobs:
           path: "${{ runner.temp }}/brew-audit.log"
           retention-days: 7
 
+      - name: Clean up local tap
+        if: always()
+        run: brew untap AniTrend/tap 2>/dev/null || true
+
   install:
     name: Install and test
     runs-on: ubuntu-latest
@@ -115,7 +119,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c
 
       - name: Tap self
         run: |
@@ -130,3 +134,7 @@ jobs:
       - name: Test formula
         run: |
           brew test stackctl
+
+      - name: Clean up local tap
+        if: always()
+        run: brew untap AniTrend/tap 2>/dev/null || true
