@@ -28,6 +28,9 @@ class Stackctl < Formula
   # directly from GitHub Releases.
   pour_bottle? { false }
 
+  depends_on "age"
+  depends_on "sops"
+
   on_macos do
     on_arm do
       url "https://github.com/AniTrend/stackctl/releases/download/v0.0.2/stackctl-v0.0.2-aarch64-apple-darwin.tar.gz"
@@ -49,10 +52,6 @@ class Stackctl < Formula
     end
   end
 
-  # No hard dependencies; sops and age are optional runtime tools.
-  # Docker is not hard-depended on because many macOS users get Docker CLI
-  # through Docker Desktop.
-
   def install
     bin.install "stackctl"
 
@@ -71,11 +70,6 @@ class Stackctl < Formula
 
   def caveats
     <<~EOS
-      Secrets commands require sops and age.
-
-      Install with:
-        brew install sops age
-
       Validate with:
         stackctl doctor --check-secrets
     EOS
