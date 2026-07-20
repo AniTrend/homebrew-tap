@@ -131,7 +131,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERSION="${{ inputs.version || github.event.client_payload.version }}"
-          VERSION_NUM="${VERSION#v}"
 
           # Expected platform tarballs
           EXPECTED_ARCHS=(
@@ -158,7 +157,7 @@ jobs:
           # Validate all 4 expected assets are present
           MISSING=false
           for ARCH in "${EXPECTED_ARCHS[@]}"; do
-            EXPECTED_NAME="stackctl-${VERSION_NUM}-${ARCH}.tar.gz"
+            EXPECTED_NAME="stackctl-${VERSION}-${ARCH}.tar.gz"
             if ! echo "$ALL_TARBALLS" | grep -qF "$EXPECTED_NAME"; then
               echo "ERROR: Missing expected asset: $EXPECTED_NAME"
               MISSING=true
@@ -178,7 +177,7 @@ jobs:
           UPDATES="["
           FIRST=true
           for ARCH in "${EXPECTED_ARCHS[@]}"; do
-            ASSET="stackctl-${VERSION_NUM}-${ARCH}.tar.gz"
+            ASSET="stackctl-${VERSION}-${ARCH}.tar.gz"
 
             gh release download "$VERSION" \
               --repo AniTrend/stackctl \
