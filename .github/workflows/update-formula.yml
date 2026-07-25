@@ -200,6 +200,7 @@ jobs:
           done
 
           UPDATES+="]"
+          UPDATES=$(echo "$UPDATES" | jq -c .)
           echo "UPDATES=$UPDATES" >> "$GITHUB_ENV"
 
           echo ""
