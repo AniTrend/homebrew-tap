@@ -1,0 +1,22 @@
+[
+  {
+    "asset": "stackctl-v0.2.1-aarch64-apple-darwin.tar.gz",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "url": "https://github.com/AniTrend/stackctl/releases/download/v0.2.1/stackctl-v0.2.1-aarch64-apple-darwin.tar.gz"
+  },
+  {
+    "asset": "stackctl-v0.2.1-x86_64-apple-darwin.tar.gz",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "url": "https://github.com/AniTrend/stackctl/releases/download/v0.2.1/stackctl-v0.2.1-x86_64-apple-darwin.tar.gz"
+  },
+  {
+    "asset": "stackctl-v0.2.1-aarch64-unknown-linux-gnu.tar.gz",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "url": "https://github.com/AniTrend/stackctl/releases/download/v0.2.1/stackctl-v0.2.1-aarch64-unknown-linux-gnu.tar.gz"
+  },
+  {
+    "asset": "stackctl-v0.2.1-x86_64-unknown-linux-gnu.tar.gz",
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "url": "https://github.com/AniTrend/stackctl/releases/download/v0.2.1/stackctl-v0.2.1-x86_64-unknown-linux-gnu.tar.gz"
+  }
+]

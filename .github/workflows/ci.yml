@@ -5,9 +5,9 @@
 #   - workflow_dispatch with optional perform-install flag
 #
 # Jobs:
-#   lint      — Ruby syntax/style check (always runs)
-#   audit     — brew audit (non-blocking for placeholder, blocking for real versions)
-#   install   — brew install + test (conditional, requires perform-install=true)
+#   lint      - Ruby syntax/style check (always runs)
+#   audit     - brew audit (non-blocking for placeholder, blocking for real versions)
+#   install   - brew install + test (conditional, requires perform-install=true)
 #
 # Docs-only changes (README.md, CONTRIBUTING.md, etc.) skip all formula jobs.
 
@@ -75,11 +75,38 @@ jobs:
           brew tap --force AniTrend/tap "${{ github.workspace }}"
           brew trust AniTrend/tap
 
-      - name: Detect placeholder version
+      - name: Detect placeholder release
         id: version-check
         run: |
-          VERSION=$(grep -E '^[[:space:]]*version[[:space:]]' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          if [ "$VERSION" = "0.0.0" ]; then
+          release_tags=()
+          while IFS= read -r release_url; do
+            if [[ "$release_url" =~ /download/(v[0-9]+\.[0-9]+\.[0-9]+)/ ]]; then
+              tag="${BASH_REMATCH[1]}"
+              seen=false
+              for existing in "${release_tags[@]}"; do
+                if [ "$existing" = "$tag" ]; then
+                  seen=true
+                  break
+                fi
+              done
+              if [ "$seen" = "false" ]; then
+                release_tags+=("$tag")
+              fi
+            fi
+          done < <(grep -Eo 'https://github\.com/AniTrend/stackctl/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/[^"[:space:]]+' Formula/stackctl.rb || true)
+
+          if [ "${#release_tags[@]}" -eq 0 ]; then
+            echo "Expected at least one stackctl release URL in Formula/stackctl.rb, found 0" >&2
+            exit 1
+          fi
+
+          if [ "${#release_tags[@]}" -ne 1 ]; then
+            echo "Expected exactly one stackctl release tag in Formula/stackctl.rb, found ${#release_tags[@]}" >&2
+            printf '%s\n' "${release_tags[@]}" >&2
+            exit 1
+          fi
+
+          if [ "${release_tags[0]}" = "v0.0.0" ]; then
             echo "placeholder=true" >> "$GITHUB_OUTPUT"
           else
             echo "placeholder=false" >> "$GITHUB_OUTPUT"
@@ -92,13 +119,15 @@ jobs:
           set +o pipefail
           brew audit --strict --online stackctl 2>&1 \
             | tee "${{ runner.temp }}/brew-audit.log"
+          audit_status=${PIPESTATUS[0]}
           set -o pipefail
           # Skip exit code check for placeholder versions (0.0.0).
           # For real versions, audit failures are blocking.
           if [ "${IS_PLACEHOLDER}" = "true" ]; then
-            echo "Audit completed (placeholder — non-blocking)"
+            echo "Audit completed (placeholder, non-blocking)"
             exit 0
           fi
+          exit "$audit_status"
 
       - name: Upload audit log
         if: failure()
@@ -134,4 +163,3 @@ jobs:
       - name: Test formula
         run: |
           brew test stackctl
-

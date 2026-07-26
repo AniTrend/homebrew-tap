@@ -1,0 +1,21 @@
+{
+  "tagName": "v0.2.1",
+  "assets": [
+    {
+      "name": "stackctl-v0.2.1-aarch64-apple-darwin.tar.gz",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "stackctl-v0.2.1-x86_64-apple-darwin.tar.gz",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "name": "stackctl-v0.2.1-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "name": "stackctl-v0.2.1-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}
