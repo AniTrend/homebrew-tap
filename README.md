@@ -20,16 +20,14 @@ Add the tap:
 brew tap AniTrend/tap
 ```
 
-Once a formula is published, install it:
+Install the published formula:
 
 ```bash
 brew install stackctl
 ```
 
-After the first stackctl release, the formula at `Formula/stackctl.rb` will
-point to real release assets. Until then, the formula is a placeholder and
-`brew install` will fail. Follow [AniTrend/stackctl](https://github.com/AniTrend/stackctl)
-for release announcements.
+The formula at `Formula/stackctl.rb` points to pinned stackctl release assets
+and checksums. New releases are promoted by the maintainer workflow below.
 
 Once installed, tools can be upgraded with:
 
@@ -41,7 +39,7 @@ brew upgrade stackctl
 
 | Formula | Description | Status |
 |---------|-------------|--------|
-| `stackctl` | Repository-aware Docker Swarm stack controller with SOPS/age support | First release pending |
+| `stackctl` | Repository-aware Docker Swarm stack controller with SOPS/age support | Published |
 
 Additional AniTrend CLI tools may be added to this tap in the future. One tap can host multiple formulae.
 
@@ -137,6 +135,9 @@ stackctl doctor --check-secrets
 
 Use the `Update stackctl formula` workflow (Actions tab) to automate formula
 updates when a new stackctl release is published:
+
+See [stackctl formula update flow](docs/stackctl-formula-update-flow.md) for the
+automation graph, data ownership, and known validation risks.
 
 ```bash
 # Manual dispatch with version tag

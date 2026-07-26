@@ -1,0 +1,44 @@
+name: Updater CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/updater-ci.yml"
+      - ".github/workflows/update-formula.yml"
+      - "tools/formula-updater/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/updater-ci.yml"
+      - ".github/workflows/update-formula.yml"
+      - "tools/formula-updater/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  updater:
+    name: Deno updater validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+          cache: true
+
+      - name: Run updater checks
+        working-directory: tools/formula-updater
+        run: |
+          deno task test
+          deno task check
+          deno task lint
+          deno task fmt --check

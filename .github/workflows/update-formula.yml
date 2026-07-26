@@ -19,7 +19,7 @@
 #   - Filters release assets to the 4 expected platform tarballs; fails if
 #     the expected set is incomplete.
 #   - Downloads each asset, computes SHA256.
-#   - Patches Formula/stackctl.rb with new version, URLs, and checksums.
+#   - Updates Formula/stackctl.rb with new version, URLs, and checksums.
 #   - Validates the updated formula (brew install + brew test).
 #   - Opens a pull request on homebrew-tap.
 #   - Dry-run mode validates data without opening a PR.
@@ -38,10 +38,7 @@ on:
         default: false
         type: boolean
 
-  # FIXME: Enable once release automation is stable.
-  # When enabling:
-  #   1. Change the job-level `if:` condition to accept repository_dispatch events.
-  #   2. Add `types: [stackctl-release]` to match the release workflow payload.
+  # Triggered by AniTrend/stackctl release automation.
   repository_dispatch:
     types: [stackctl-release]
 
@@ -89,8 +86,16 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+          cache: true
+
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@1f8e202ffddf94def7f42f6fa3a482e821489f9c
+        env:
+          GITHUB_ACTIONS_HOMEBREW_SELF_HOSTED: 1
 
       - name: Verify formula is not placeholder
         run: |
@@ -209,37 +214,22 @@ jobs:
 
       - name: Patch formula
         run: |
-          FORMULA="Formula/stackctl.rb"
-          VERSION_NUM="${VERSION#v}"
+          UPDATES_FILE="${RUNNER_TEMP}/stackctl-updates.json"
+          printf '%s\n' "$UPDATES" > "$UPDATES_FILE"
 
-          echo "=== Before patch ==="
-          head -5 "$FORMULA"
+          (
+            cd tools/formula-updater
+            deno task cli update \
+              --formula-path ../../Formula/stackctl.rb \
+              --version "$VERSION" \
+              --updates-file "$UPDATES_FILE"
+          )
 
-          # Update version line
-          sed -i "s/^version \".*\"/version \"$VERSION_NUM\"/" "$FORMULA"
-
-          # For each platform asset, patch URL and SHA256 by matching the
-          # target triple in the asset name with the formula's URL patterns.
-          echo "$UPDATES" | jq -c '.[]' | while IFS= read -r ASSET; do
-            ASSET_NAME=$(echo "$ASSET" | jq -r '.asset')
-            SHA=$(echo "$ASSET" | jq -r '.sha256')
-            URL=$(echo "$ASSET" | jq -r '.url')
-
-            echo "Patching: $ASSET_NAME"
-
-            TARGET=$(echo "$ASSET_NAME" | sed "s/^stackctl-v[0-9.]*-//" | sed 's/\.tar\.gz$//')
-            ESCAPED_TARGET=$(echo "$TARGET" | sed 's/[.]/\\./g')
-
-            # Patch URL line containing this target
-            sed -i "/${ESCAPED_TARGET}\.tar\.gz/s|url \".*\"|url \"$URL\"|" "$FORMULA"
-
-            # Patch sha256 on the line following the matching URL
-            sed -i "/${ESCAPED_TARGET}\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$FORMULA"
-          done
-
-          echo ""
-          echo "=== After patch ==="
-          grep -E "^(version|  url|  sha256)" "$FORMULA"
+      - name: Tap repository
+        run: |
+          brew untap AniTrend/tap 2>/dev/null || true
+          brew tap --force AniTrend/tap "${{ github.workspace }}"
+          brew trust AniTrend/tap
 
       - name: Validate updated formula
         id: validate

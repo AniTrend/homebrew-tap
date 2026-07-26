@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "formulaName": "stackctl",
+  "formulaPath": "Formula/stackctl.rb",
+  "sourceRepo": "AniTrend/stackctl",
+  "dispatchEventType": "stackctl-release",
+  "tagPattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+  "versionTransform": {
+    "type": "strip-v-prefix"
+  },
+  "assetPattern": "stackctl-{version}-{target}.tar.gz",
+  "urlTemplate": "https://github.com/AniTrend/stackctl/releases/download/{version}/{asset}",
+  "platformTargets": [
+    {
+      "key": "macos-arm64",
+      "target": "aarch64-apple-darwin",
+      "os": "macos",
+      "arch": "arm64",
+      "selectorPath": ["on_macos", "on_arm"]
+    },
+    {
+      "key": "macos-x86_64",
+      "target": "x86_64-apple-darwin",
+      "os": "macos",
+      "arch": "x86_64",
+      "selectorPath": ["on_macos", "on_intel"]
+    },
+    {
+      "key": "linux-arm64",
+      "target": "aarch64-unknown-linux-gnu",
+      "os": "linux",
+      "arch": "arm64",
+      "selectorPath": ["on_linux", "on_arm"]
+    },
+    {
+      "key": "linux-x86_64",
+      "target": "x86_64-unknown-linux-gnu",
+      "os": "linux",
+      "arch": "x86_64",
+      "selectorPath": ["on_linux", "on_intel"]
+    }
+  ],
+  "validationPolicy": {
+    "allowExtraAssets": true,
+    "requiredAssetCount": 4,
+    "homebrewValidation": "github-actions"
+  }
+}

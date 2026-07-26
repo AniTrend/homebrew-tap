@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "test": "deno test --allow-read --allow-write",
+    "check": "deno check src/cli.ts tests/formula_updater_test.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "cli": "deno run --allow-read --allow-write src/cli.ts"
+  }
+}
