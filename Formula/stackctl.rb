@@ -71,6 +71,16 @@ class Stackctl < Formula
     <<~EOS
       Validate with:
         stackctl doctor --check-secrets
+
+      Optional AI agent skill:
+        npx skills add anitrend/stackctl --skill stackctl-cli
+
+      For global non-interactive installation:
+        npx skills add anitrend/stackctl --skill stackctl-cli -g -y
+
+      This installs only the AI agent skill. stackctl remains a Deno CLI.
+      Requires Node.js/npm (for the skill install only, not for stackctl).
+      Restart or reload OpenCode after installing new skills.
     EOS
   end
 
