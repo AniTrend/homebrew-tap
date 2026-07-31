@@ -1,3 +1,4 @@
+import { validateReleaseShape } from "./release_assets.ts";
 import type {
   FormulaRegistry,
   PlannedAsset,
@@ -5,7 +6,7 @@ import type {
   UpdatePlan,
 } from "./types.ts";
 
-const sha256Pattern = /^[a-f0-9]{64}$/i;
+export const sha256Pattern = /^[a-f0-9]{64}$/i;
 
 interface WorkflowUpdate {
   asset: string;
@@ -192,20 +193,6 @@ export function transformVersion(
   );
 }
 
-function validateReleaseShape(release: ReleaseData): void {
-  if (!release || typeof release !== "object") {
-    throw new Error("Release data must be an object");
-  }
-  if (!Array.isArray(release.assets)) {
-    throw new Error("Release data must include an assets array");
-  }
-  for (const [index, asset] of release.assets.entries()) {
-    if (!asset || typeof asset !== "object" || typeof asset.name !== "string") {
-      throw new Error(`Release asset at index ${index} must include a name`);
-    }
-  }
-}
-
 function parseWorkflowUpdate(value: unknown, path: string): WorkflowUpdate {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${path} must be an object`);
@@ -225,7 +212,10 @@ function expectString(value: unknown, path: string): string {
   return value;
 }
 
-function render(template: string, values: Record<string, string>): string {
+export function render(
+  template: string,
+  values: Record<string, string>,
+): string {
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, key: string) => {
     const value = values[key];
     if (value === undefined) {
