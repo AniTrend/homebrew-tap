@@ -42,3 +42,35 @@ jobs:
           deno task check
           deno task lint
           deno task fmt --check
+
+  simulate:
+    name: Simulate formula update pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+          cache: true
+
+      - name: Simulate update from v0.0.2 to v0.2.1
+        working-directory: tools/formula-updater
+        run: |
+          deno task cli simulate \
+            --release tests/fixtures/stackctl/release.v0.2.1.json \
+            --formula tests/fixtures/stackctl/formula.before.rb
+
+      - name: Inspect real repository formula
+        working-directory: tools/formula-updater
+        run: |
+          deno task cli inspect --formula-path ../../Formula/stackctl.rb --require-real-version
+
+      - name: Validate release assets from fixture
+        working-directory: tools/formula-updater
+        run: |
+          deno task cli validate-release \
+            --release-file tests/fixtures/stackctl/release.v0.2.1.json \
+            --version v0.2.1

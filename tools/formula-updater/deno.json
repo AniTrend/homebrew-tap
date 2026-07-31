@@ -1,7 +1,7 @@
 {
   "tasks": {
     "test": "deno test --allow-read --allow-write",
-    "check": "deno check src/cli.ts tests/formula_updater_test.ts",
+    "check": "deno check src/cli.ts src/formula_version.ts src/release_assets.ts tests/formula_updater_test.ts tests/formula_version_test.ts tests/release_assets_test.ts tests/cli_commands_test.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
     "cli": "deno run --allow-read --allow-write src/cli.ts"

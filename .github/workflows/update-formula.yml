@@ -16,13 +16,14 @@
 # Behavior:
 #   - Validates that the formula has a real version (not placeholder 0.0.0).
 #   - Fetches release metadata for the given version from AniTrend/stackctl.
-#   - Filters release assets to the 4 expected platform tarballs; fails if
-#     the expected set is incomplete.
+#   - Validates expected release asset names through the Deno registry-driven CLI.
 #   - Downloads each asset, computes SHA256.
 #   - Updates Formula/stackctl.rb with new version, URLs, and checksums.
-#   - Validates the updated formula (brew install + brew test).
+#   - Always runs read-only validation (brew style + brew audit).
+#   - Runs brew install + brew test only when dry-run is disabled.
 #   - Opens a pull request on homebrew-tap.
-#   - Dry-run mode validates data without opening a PR.
+#   - Dry-run mode patches and validates the formula without pushing, opening a PR,
+#     installing the formula, or running brew test.
 
 name: Update stackctl formula
 
@@ -34,8 +35,8 @@ on:
         required: true
         type: string
       dry-run:
-        description: "Validate release data without opening a PR"
-        default: false
+        description: "Run all validation steps without creating a PR or installing formula"
+        default: true
         type: boolean
 
   # Triggered by AniTrend/stackctl release automation.
@@ -99,17 +100,10 @@ jobs:
 
       - name: Verify formula is not placeholder
         run: |
-          VERSION=$(grep -E '^[[:space:]]*version[[:space:]]' Formula/stackctl.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          if [ "$VERSION" = "0.0.0" ]; then
-            echo "Error: Formula/stackctl.rb still uses placeholder version 0.0.0."
-            echo "This workflow requires a real formula with actual release URLs."
-            echo ""
-            echo "Fix: Replace the placeholder version, URLs, and SHA256s in"
-            echo "Formula/stackctl.rb with values from the first stackctl release,"
-            echo "or merge the formula PR that delivers real values first."
-            exit 1
-          fi
-          echo "Formula version: $VERSION (OK)"
+          (
+            cd tools/formula-updater
+            deno task cli inspect --formula-path ../../Formula/stackctl.rb --require-real-version
+          )
 
       - name: Fetch release metadata
         id: release
@@ -130,60 +124,33 @@ jobs:
 
           echo "RELEASE_JSON=$(echo "$RELEASE_JSON" | jq -c .)" >> "$GITHUB_ENV"
 
-      - name: Filter and validate release assets
+      - name: Validate release assets
+        run: |
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
+
+          EXPECTED_ASSETS=$(
+            (
+              cd tools/formula-updater
+              deno task cli validate-release --release-json "$RELEASE_JSON" --version "$VERSION"
+            ) | jq -c .
+          )
+          echo "EXPECTED_ASSETS=$EXPECTED_ASSETS" >> "$GITHUB_ENV"
+
+          echo ""
+          echo "=== Expected release assets ==="
+          echo "$EXPECTED_ASSETS" | jq -r '.[]'
+
+      - name: Download and checksum assets
         id: assets
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERSION="${{ inputs.version || github.event.client_payload.version }}"
-
-          # Expected platform tarballs
-          EXPECTED_ARCHS=(
-            "x86_64-apple-darwin"
-            "aarch64-apple-darwin"
-            "x86_64-unknown-linux-gnu"
-            "aarch64-unknown-linux-gnu"
-          )
-
-          # Get all tarball assets from the release
-          ALL_TARBALLS=$(echo "$RELEASE_JSON" | jq -r \
-            '.assets[] | select(.name | endswith(".tar.gz")) | .name')
-
-          if [ -z "$ALL_TARBALLS" ]; then
-            echo "Error: No .tar.gz assets found in release $VERSION"
-            echo "Release assets:"
-            echo "$RELEASE_JSON" | jq -r '.assets[].name'
-            exit 1
-          fi
-
-          echo "Available tarballs:"
-          echo "$ALL_TARBALLS"
-
-          # Validate all 4 expected assets are present
-          MISSING=false
-          for ARCH in "${EXPECTED_ARCHS[@]}"; do
-            EXPECTED_NAME="stackctl-${VERSION}-${ARCH}.tar.gz"
-            if ! echo "$ALL_TARBALLS" | grep -qF "$EXPECTED_NAME"; then
-              echo "ERROR: Missing expected asset: $EXPECTED_NAME"
-              MISSING=true
-            fi
-          done
-
-          if [ "$MISSING" = true ]; then
-            echo ""
-            echo "Not all expected platform tarballs are present."
-            echo "Expected archs: ${EXPECTED_ARCHS[*]}"
-            exit 1
-          fi
-
-          # Download and checksum only the expected tarballs
           ASSETS_DIR=$(mktemp -d)
+          trap 'rm -rf "$ASSETS_DIR"' EXIT
 
-          UPDATES="["
-          FIRST=true
-          for ARCH in "${EXPECTED_ARCHS[@]}"; do
-            ASSET="stackctl-${VERSION}-${ARCH}.tar.gz"
-
+          UPDATES=$(while IFS= read -r ASSET; do
+            [ -n "$ASSET" ] || continue
             gh release download "$VERSION" \
               --repo AniTrend/stackctl \
               --pattern "$ASSET" \
@@ -191,21 +158,13 @@ jobs:
 
             SHA=$(sha256sum "$ASSETS_DIR/$ASSET" | cut -d' ' -f1)
 
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              UPDATES+=","
-            fi
-
-            UPDATES+=$(jq -n \
+            jq -n \
               --arg name "$ASSET" \
               --arg sha "$SHA" \
               --arg url "https://github.com/AniTrend/stackctl/releases/download/$VERSION/$ASSET" \
-              '{asset: $name, sha256: $sha, url: $url}')
-          done
+              '{asset: $name, sha256: $sha, url: $url}'
+          done < <(echo "$EXPECTED_ASSETS" | jq -r '.[]') | jq -cs .)
 
-          UPDATES+="]"
-          UPDATES=$(echo "$UPDATES" | jq -c .)
           echo "UPDATES=$UPDATES" >> "$GITHUB_ENV"
 
           echo ""
@@ -231,8 +190,7 @@ jobs:
           brew tap --force AniTrend/tap "${{ github.workspace }}"
           brew trust AniTrend/tap
 
-      - name: Validate updated formula
-        id: validate
+      - name: Validate formula (read-only)
         run: |
           echo "Running brew style..."
           brew style Formula/stackctl.rb
@@ -241,6 +199,9 @@ jobs:
           echo "Running brew audit..."
           brew audit --strict --online stackctl
 
+      - name: Validate formula (install + test)
+        if: env.DRY_RUN != 'true'
+        run: |
           echo ""
           echo "Running brew install..."
           brew install --formula Formula/stackctl.rb
@@ -294,4 +255,12 @@ jobs:
           echo "Assets:"
           echo "$UPDATES" | jq -r '.[] | "  \(.asset): \(.sha256)"'
           echo ""
-          echo "Formula would be patched and PR would be opened."
+          echo "Validation steps run:"
+          echo "  - Patch formula"
+          echo "  - brew style"
+          echo "  - brew audit --strict --online"
+          echo ""
+          echo "Skipped side effects:"
+          echo "  - brew install --formula Formula/stackctl.rb"
+          echo "  - brew test stackctl"
+          echo "  - git push and gh pr create"
