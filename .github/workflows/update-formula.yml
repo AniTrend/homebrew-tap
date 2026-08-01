@@ -188,7 +188,11 @@ jobs:
         run: |
           brew untap AniTrend/tap 2>/dev/null || true
           brew tap --force AniTrend/tap "${{ github.workspace }}"
-          brew trust AniTrend/tap
+          TAP_DIR="$(brew --repository AniTrend/tap)"
+          cp "${{ github.workspace }}/Formula/stackctl.rb" "${TAP_DIR}/Formula/stackctl.rb"
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
+          grep -q "${VERSION}" "${TAP_DIR}/Formula/stackctl.rb"
+          brew trust --formula AniTrend/tap/stackctl
 
       - name: Validate formula (read-only)
         run: |
@@ -197,18 +201,18 @@ jobs:
 
           echo ""
           echo "Running brew audit..."
-          brew audit --strict --online stackctl
+          brew audit --strict --online AniTrend/tap/stackctl
 
       - name: Validate formula (install + test)
         if: env.DRY_RUN != 'true'
         run: |
           echo ""
           echo "Running brew install..."
-          brew install --formula Formula/stackctl.rb
+          brew install --formula AniTrend/tap/stackctl
 
           echo ""
           echo "Running brew test..."
-          brew test stackctl
+          brew test AniTrend/tap/stackctl
 
       - name: Create pull request
         if: env.DRY_RUN != 'true'
@@ -261,6 +265,6 @@ jobs:
           echo "  - brew audit --strict --online"
           echo ""
           echo "Skipped side effects:"
-          echo "  - brew install --formula Formula/stackctl.rb"
-          echo "  - brew test stackctl"
+          echo "  - brew install --formula AniTrend/tap/stackctl"
+          echo "  - brew test AniTrend/tap/stackctl"
           echo "  - git push and gh pr create"

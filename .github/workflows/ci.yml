@@ -73,7 +73,7 @@ jobs:
         run: |
           brew untap AniTrend/tap 2>/dev/null || true
           brew tap --force AniTrend/tap "${{ github.workspace }}"
-          brew trust AniTrend/tap
+          brew trust --formula AniTrend/tap/stackctl
 
       - name: Detect placeholder release
         id: version-check
@@ -117,7 +117,7 @@ jobs:
           IS_PLACEHOLDER: ${{ steps.version-check.outputs.placeholder }}
         run: |
           set +o pipefail
-          brew audit --strict --online stackctl 2>&1 \
+          brew audit --strict --online AniTrend/tap/stackctl 2>&1 \
             | tee "${{ runner.temp }}/brew-audit.log"
           audit_status=${PIPESTATUS[0]}
           set -o pipefail
@@ -154,12 +154,12 @@ jobs:
         run: |
           brew untap AniTrend/tap 2>/dev/null || true
           brew tap --force AniTrend/tap "${{ github.workspace }}"
-          brew trust AniTrend/tap
+          brew trust --formula AniTrend/tap/stackctl
 
       - name: Install formula
         run: |
-          brew install --formula Formula/stackctl.rb
+          brew install --formula AniTrend/tap/stackctl
 
       - name: Test formula
         run: |
-          brew test stackctl
+          brew test AniTrend/tap/stackctl
