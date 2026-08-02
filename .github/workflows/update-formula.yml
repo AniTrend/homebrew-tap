@@ -232,17 +232,27 @@ jobs:
           git push origin "$BRANCH"
 
           # Build PR body
-          BODY=$(printf '## Automated formula update\n\n')
-          BODY="${BODY}$(printf 'Updates stackctl formula to **%s**.\n\n' "${VERSION}")"
-          BODY="${BODY}$(printf '### Release assets\n\n')"
-          BODY="${BODY}$(printf '```\n')"
-          BODY="${BODY}$(echo "$UPDATES" | jq -r '.[] | "\(.asset): \(.sha256)"')"
-          BODY="${BODY}$(printf '\n```\n\n')"
-          BODY="${BODY}$(printf '### Validation\n\n')"
-          BODY="${BODY}$(printf -- '- brew style: passed\n')"
-          BODY="${BODY}$(printf -- '- brew audit: completed\n')"
-          BODY="${BODY}$(printf -- '- brew install: completed\n')"
-          BODY="${BODY}$(printf -- '- brew test: completed\n')"
+          ASSET_ROWS=$(jq -r '.[] | "| \(.asset) | \(.sha256) |"' <<< "$UPDATES")
+
+          BODY=$(cat <<EOF
+          ## Automated formula update
+
+          Updates stackctl formula to **${VERSION}**.
+
+          ### Release assets
+
+          | Asset | SHA256 |
+          | --- | --- |
+          ${ASSET_ROWS}
+
+          ### Validation
+
+          - brew style: passed
+          - brew audit: completed
+          - brew install: completed
+          - brew test: completed
+          EOF
+          )
 
           gh pr create \
             --repo AniTrend/homebrew-tap \
