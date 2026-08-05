@@ -32,22 +32,22 @@ class Stackctl < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.2/stackctl-v0.2.2-aarch64-apple-darwin.tar.gz"
-      sha256 "c19931d30de42653ef4fe30dc88a49603ebfede623603180a00d6df3d7332041"
+      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.4/stackctl-v0.2.4-aarch64-apple-darwin.tar.gz"
+      sha256 "947fa885296edc32da074aee1233c893dd5ab7c6abbdda487820b8da0b98d0c1"
     end
     on_intel do
-      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.2/stackctl-v0.2.2-x86_64-apple-darwin.tar.gz"
-      sha256 "f0d1c2c68cfb763b867e8e73ec153eb48a1aba91373a9fb5412ba55b786abd8d"
+      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.4/stackctl-v0.2.4-x86_64-apple-darwin.tar.gz"
+      sha256 "5cce2dc4fe6cf54febcf20d70318742d8c2470f284c0cfbf1998e68b5d3dabe1"
     end
   end
   on_linux do
     on_arm do
-      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.2/stackctl-v0.2.2-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "3f7c10c68bb3db5c6626772577c7f6e74fad88e0ebfc9514c4ee10c65a961aad"
+      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.4/stackctl-v0.2.4-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "da39633a67c62b1089e99fbfb5fe1f6601b8f7ab5a4c5eeae6a2719e79318ffc"
     end
     on_intel do
-      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.2/stackctl-v0.2.2-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "aba8c6548683c365628adf6b7905c4c5b3c44e8d02bb10d2b25724cb815a6e2e"
+      url "https://github.com/AniTrend/stackctl/releases/download/v0.2.4/stackctl-v0.2.4-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "14bcc38d5da6fc5cc94aa95de97891e67a3048278867adc96ac4892c8335e960"
     end
   end
 
