@@ -16,7 +16,7 @@ Deno.test("detectFormulaVersion reads version from real formula URLs", async () 
 
   const result = detectFormulaVersion(formulaText, registry.sourceRepo);
 
-  assertEquals(result.versionTag, "v0.0.2");
+  assertEquals(result.versionTag, "v0.4.0");
   assertEquals(result.isPlaceholder, false);
 });
 
@@ -74,7 +74,7 @@ Deno.test("extractReleaseUrls returns all formula release URLs", async () => {
   assertEquals(urls.length, 4);
   assert(
     urls.includes(
-      "https://github.com/AniTrend/stackctl/releases/download/v0.0.2/stackctl-v0.0.2-aarch64-apple-darwin.tar.gz",
+      "https://github.com/AniTrend/stackctl/releases/download/v0.4.0/stackctl-v0.4.0-aarch64-apple-darwin.tar.gz",
     ),
   );
 });
