@@ -13,7 +13,7 @@ Deno.test("inspect command reports the real formula version", async () => {
     urlCount: number;
   };
 
-  assertEquals(result.versionTag, "v0.0.2");
+  assertEquals(result.versionTag, "v0.4.0");
   assertEquals(result.isPlaceholder, false);
   assertEquals(result.urlCount, 4);
 });
